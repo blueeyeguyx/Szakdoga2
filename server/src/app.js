@@ -24,6 +24,7 @@ app.get("/api/users",async(req,res)=>{
   res.json({Users});
 })
 
+
 app.post("/api/calculate", async (req, res) => {
     const age = Number(req.body.age);
     const weight = Number(req.body.weight);
@@ -64,7 +65,9 @@ app.post("/api/calculate", async (req, res) => {
     const remainingCalories = calories - (protein1 * 4 + fat1 * 9);
     const carbs1 = remainingCalories / 4;
     calories = Math.floor(calories);
-      const user = await User.create({
+    const userData = {
+        email: req.body.email,
+        name: req.body.name,
         age,
         weight,
         height,
@@ -73,12 +76,25 @@ app.post("/api/calculate", async (req, res) => {
         intolerances,
         lifestyle,
         calories
-      });
+      };
+    let user = await User.findOne({email: req.body.email});
+    if(user){
+      user = await User.findOneAndUpdate(
+        {email: req.body.email},
+        userData,
+        {new: true}
+      );
+    } 
+    else{
+      user = User.create(userData);
+    }
+
     const macros = {
       protein: protein1,
       fat: fat1,
       carbs: carbs1
     }
+    await Plan.deleteMany({userID: user._id});
     const planData = GeneratePlan(req.body, macros,calories,intolerances);
     const plan = await Plan.create({
       userID: user._id,

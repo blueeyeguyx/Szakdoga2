@@ -29,7 +29,8 @@ function App() {
 
   const[calories,setCalories] = useState(null);
   const handleChange = E => {setFormdata({...formdata,[E.target.name]:E.target.value});};
-  const handleSubmit = async E => {E.preventDefault();
+  const handleSubmit = async E => {
+    E.preventDefault();
     try {
       const res = await axios.post("http://localhost:5000/api/calculate",formdata);
       console.log(res);
@@ -167,5 +168,3 @@ function App() {
 }
 
 export default App;
-/*
-*/
