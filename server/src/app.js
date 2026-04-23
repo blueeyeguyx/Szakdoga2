@@ -4,7 +4,11 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import {User} from "./models/User.js";
 import { Plan } from "./models/Plan.js";
-import { GeneratePlan } from "./services/plangenerator.js";
+import { GeneratePlan } from "./services/planGeneratorService.js";
+import {calculate} from "./services/nutritionService.js";
+import { authMiddleware } from "./routes/Authentication.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 //import  userRouter  from "./routes/userRoute.js";
 //import profileRouter from "./routes/profileRoute.js";
 
@@ -12,6 +16,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+dotenv.config();
 
 mongoose.connect("mongodb://localhost:27017/fitness-app").then(()=>console.log("MongoDB is running")).catch(R => console.error("MongoDB Error: ",R));
 
@@ -22,80 +27,35 @@ app.get("/api/health", (req, res) => {
 app.get("/api/users",async(req,res)=>{
   const Users = await User.find();
   res.json({Users});
-})
+});
 
 
-app.post("/api/calculate", async (req, res) => {
-    const age = Number(req.body.age);
-    const weight = Number(req.body.weight);
-    const height = Number(req.body.height);
-    const gender = req.body.gender;
-    const goal = req.body.goal;
-    const intolerances = req.body.intolerances;
-    const lifestyle = req.body.lifestyle;
-    let score;
-    const bmr = 10*weight + 6.25*height - 5*age + (gender === "male" ? 5 : -161 );
-    switch (lifestyle){
-      case "sitting":
-        score = 1.2;
-        break;
+app.post("/api/calculate", authMiddleware, async (req, res) => {
+    const userData = req.body;
 
-      case "slightlyactive":
-        score = 1.375;
-        break;
-
-      case "moderatelyactive":
-        score = 1.55;
-        break;
-
-      case "veryactive":
-        score = 1.725;
-        break;
-      case "extremelyactive":
-        score = 1.9;
-        break;
-
-      default:
-        score = 1.2;
-        break;
+    const user = await User.findById(req.userId);
+    if(!user){
+      return res.status(404).json({error: "User not found."});  
     }
-    let calories = goal === "lose" ? (bmr*score)*0.8 : goal === "bulk" ? (bmr*score)*1.2 : bmr*score;
-    const protein1 = goal === "bulk" ? weight * 2 : goal === "lose" ? weight * 1.8 : weight * 1.6;
-    const fat1 = weight * 0.8;
-    const remainingCalories = calories - (protein1 * 4 + fat1 * 9);
-    const carbs1 = remainingCalories / 4;
-    calories = Math.floor(calories);
-    const userData = {
-        email: req.body.email,
-        name: req.body.name,
-        age,
-        weight,
-        height,
-        gender,
-        goal,
-        intolerances,
-        lifestyle,
-        calories
-      };
-    let user = await User.findOne({email: req.body.email});
-    if(user){
-      user = await User.findOneAndUpdate(
-        {email: req.body.email},
-        userData,
-        {new: true}
-      );
-    } 
-    else{
-      user = User.create(userData);
-    }
-
-    const macros = {
-      protein: protein1,
-      fat: fat1,
-      carbs: carbs1
-    }
+    const allowedFields = [
+      "name",
+      "age",
+      "weight",
+      "height",
+      "goal",
+      "intolerances",
+      "dailyTime",
+      "lifestyle"
+    ];
+    allowedFields.forEach(field => {
+      if(userData[field] !== undefined){
+        user[field] = userData[field];
+      }
+    });
+    await user.save();
+    const {calories, macros} = calculate(user);
     await Plan.deleteMany({userID: user._id});
-    const planData = GeneratePlan(req.body, macros,calories,intolerances);
+    const planData = GeneratePlan(user, macros,calories);
     const plan = await Plan.create({
       userID: user._id,
       calories,
@@ -105,6 +65,89 @@ app.post("/api/calculate", async (req, res) => {
     });
     res.json({macros, plan, calories, user});
 
+});
+
+app.post("/api/register", async (req, res) => {
+    console.log("REGISTER HIT");
+    const {email, password, ...rest} = req.body;
+    try{
+      const existingUser = await User.findOne({email});
+      if (existingUser){
+        return res.status(400).json({error: "An user with this e-mail address already exists. Try logging in."});
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await User.create({
+        email,
+        password: hashedPassword,
+        ...rest
+      });
+      console.log("Created User");
+      res.json({message:"User created"});
+    }catch (error){
+      return res.status(500).json({error: "An error occured while registering."});
+    }
+});
+app.post("/api/login", async (req, res) => {
+  const {email, password, ...rest} = req.body;
+  console.log("LOGIN BODY:", req.body);
+  try{
+    const existingUser = await User.findOne({email});
+    if (!existingUser){
+      return res.status(400).json({error: "Incorrect email or password"});
+    }
+    
+  console.log("USER FROM DB:", existingUser);
+    const isMatch = await bcrypt.compare(password, existingUser.password);
+    if(!isMatch){
+      return res.status(400).json({error: "Incorrect email or password"});
+    }
+    
+  console.log("PASSWORD MATCH:", isMatch);
+    const token = jwt.sign(
+      {userId: existingUser._id},
+      process.env.JWT_SECRET,
+      {expiresIn: "7d"}
+    );
+    res.json({token, existingUser});
+  }catch(error){
+    res.status(500).json({error: "An error occured while logging in."});
+  }
+});
+app.post("/api/profile", authMiddleware, async (req, res) => {
+    const user = await User.findById(req.userId);
+    res.json({user});
+})
+
+app.post("/api/chat", async (req, res) => {
+  const {message} = req.body;
+  try{
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {  
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: `You are a helpful fitness and diet assistant. The user: 
+            -weight: ${req.body.weight}
+            -goal: ${req.body.goal}
+            -intolerances: ${req.body.intolerances} 
+            Give personalized advice. ` },
+          { role: "user", content: message }
+        ]
+      })
+    });
+    
+    const data = await response.json();
+    res.json({
+      reply: data.choices[0].message.content
+    });
+  }catch(err){
+    console.error(err);
+    res.status(500).json({error: "AI error"});
+  }
 });
 
 const PORT = 5000;

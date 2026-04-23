@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     dailyTime : Number,
     calories : Number,
     lifestyle : String,
-    email : {type : String , unique : true},
-    password : String
+    email : {type: String, unique: true},
+    password: {type: String, required: true}
 });
 export const  User = mongoose.model("User", userSchema);
