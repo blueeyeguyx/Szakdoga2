@@ -29,6 +29,14 @@ app.get("/api/users",async(req,res)=>{
   res.json({Users});
 });
 
+app.get("/api/plan", authMiddleware, async (req, res) => {
+  const plan = await Plan.findOne({userID: req.userId});
+  if(!plan){
+    return res.status(404).json({error: "No plan was found for this user"});
+  }
+  res.json(plan);
+})
+
 
 app.post("/api/calculate", authMiddleware, async (req, res) => {
     const userData = req.body;
