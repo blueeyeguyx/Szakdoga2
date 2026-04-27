@@ -76,7 +76,6 @@ app.post("/api/calculate", authMiddleware, async (req, res) => {
 });
 
 app.post("/api/register", async (req, res) => {
-    console.log("REGISTER HIT");
     const {email, password, ...rest} = req.body;
     try{
       const existingUser = await User.findOne({email});
@@ -89,7 +88,6 @@ app.post("/api/register", async (req, res) => {
         password: hashedPassword,
         ...rest
       });
-      console.log("Created User");
       res.json({message:"User created"});
     }catch (error){
       return res.status(500).json({error: "An error occured while registering."});
@@ -97,25 +95,22 @@ app.post("/api/register", async (req, res) => {
 });
 app.post("/api/login", async (req, res) => {
   const {email, password, ...rest} = req.body;
-  console.log("LOGIN BODY:", req.body);
   try{
     const existingUser = await User.findOne({email});
     if (!existingUser){
       return res.status(400).json({error: "Incorrect email or password"});
     }
     
-  console.log("USER FROM DB:", existingUser);
     const isMatch = await bcrypt.compare(password, existingUser.password);
     if(!isMatch){
       return res.status(400).json({error: "Incorrect email or password"});
     }
     
-  console.log("PASSWORD MATCH:", isMatch);
     const token = jwt.sign(
       {userId: existingUser._id},
       process.env.JWT_SECRET,
       {expiresIn: "7d"}
-    );
+    );      
     res.json({token, existingUser});
   }catch(error){
     res.status(500).json({error: "An error occured while logging in."});
