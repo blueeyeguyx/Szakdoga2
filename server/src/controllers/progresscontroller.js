@@ -1,114 +1,115 @@
 import { Plan } from "../models/Plan.js";
 import { User } from "../models/User.js";
 
+export const saveProgress = async (req, res) => {
+  const userId = req.userID;
+  const { planId, date, workouts, meals } = req.body;
 
-export const weightTracker =  async (req,res) =>{
-    try {
+  const plan = await Plan.findById(planId);
+  if (!plan) return res.status(404).json({ error: "Plan not found" });
 
-        const { weight } = req.body;
+  const normalize = (s) => s?.trim().toLowerCase();
 
-        if(!weight){
-            return res.status(400).json({
-                messsage: "Weight is required."
-            });
-        }
-        const user = await User.findById(req.userID);
+  const dayPlan = plan.workouts.find(
+    (w) => normalize(w.day) === normalize(date),
+  );
 
-        if(!user){
-            return res.status(404).json({
-                messsage: "User not found."
-            });
-        }
+  const mealPlan = plan.meals.find((m) => normalize(m.day) === normalize(date));
 
-        user.weight = weight;
-        user.weightHistory.push({
-            weight,
-            date : new Date()
-        });
-        await user.save();
-        res.json({
-            messsage: "Weight saved successfully."
-        });
-    } catch (error) {
-        res.status(500).json({
-            messsage: "Error while updating weight."
-        });
+  console.log(
+    "PLAN MEAL DAYS:",
+    plan.meals?.map((m) => m.day),
+  );
+  let totalBurned = 0;
+  let totalIntake = 0;
+
+  // 🏋️ WORKOUT LOGIC
+  const workoutResults = dayPlan.workouts.map((w) => {
+    const input = workouts?.find((x) => x.workoutId === w._id);
+
+    // 👉 DEFAULT = teljesítés
+    if (!input) {
+      const burned = estimateCalories(w);
+
+      totalBurned += burned;
+
+      return {
+        workoutId: w._id,
+        done: true,
+        repsDone: w.reps,
+        durationDone: w.duration || null,
+        caloriesBurned: burned,
+      };
     }
+
+    const burned = calculateBurn(w, input);
+
+    totalBurned += burned;
+
+    return {
+      workoutId: w._id,
+      done: true,
+      repsDone: input.repsDone || w.reps,
+      durationDone: input.durationDone || w.duration,
+      caloriesBurned: burned,
+    };
+  });
+
+  // 🍽️ MEALS LOGIC
+  const mealResults = mealPlan.meals.map((m) => {
+    const input = meals?.find((x) => x.mealId === m._id);
+
+    if (!input) {
+      totalIntake += m.calories;
+
+      return {
+        mealId: m._id,
+        gramsDone: m.gramms,
+        calories: m.calories,
+      };
+    }
+
+    const ratio = input.gramsDone / m.gramms;
+    const calories = m.calories * ratio;
+
+    totalIntake += calories;
+
+    return {
+      mealId: m._id,
+      gramsDone: input.gramsDone,
+      calories,
+    };
+  });
+
+  const net = totalIntake - totalBurned;
+
+  const log = {
+    date: new Date(),
+    workouts: workoutResults,
+    meals: mealResults,
+    totalBurned,
+    totalIntake,
+    net,
+  };
+
+  plan.dailyLogs.push(log);
+
+  await plan.save();
+
+  res.json(log);
 };
 
-export const workoutTracker = async (req,res) => {
-    try {
-
-        const {planID, completed, duration} = req.body;
-
-        if(!planID){
-            return res.status(400).json({
-                messsage: "PlanID is required."
-            });
-        }
-        const plan = await Plan.findById(planID);
-
-        const user = await User.findById(req.userID);
-
-        if(!user || !plan){
-            return res.status(404).json({
-                messsage: "User or plan not found."
-            });
-        }
-
-        user.workoutHistory.push({
-            planId :planID,
-            date : new Date(),
-            completed : completed ?? true,
-            duration : duration || 0
-        });
-
-        await user.save();
-        res.json({
-            messsage: "Workout saved successfully."
-        });
-    } catch (error) {
-        res.status(500).json({
-            messsage: "Error while logging workout."
-        });
-    }
+// helpers
+const estimateCalories = (w) => {
+  if (w.type === "cardio") {
+    return w.duration * w.caloriesPerMin;
+  }
+  return w.sets * w.reps * w.caloriesPerMin;
 };
 
-export const macroTracker = async (req,res) => {
-    try {
-
-        const {calories,carbs,protein,fat} = req.body;
-
-        if(!calories || !carbs || !protein || !fat){
-            return res.status(400).json({
-                messsage: "All fields are required."
-            });
-        }
-
-        const user = await User.findById(req.userID);
-
-        if(!user){
-            return res.status(404).json({
-                messsage: "User not found."
-            });
-        }
-
-        user.macroHistory.push({
-            date : new Date(),
-            calories : calories,
-            carbs : carbs,
-            protein : protein,
-            fat : fat
-        });
-
-        await user.save();
-        res.json({
-            messsage: "Calories and macros saved successfully."
-        });
-    } catch (error) {
-        res.status(500).json({
-            messsage: "Error while logging calories and macros."
-        });
-    }
-
+const calculateBurn = (w, input) => {
+  if (w.type === "cardio") {
+    return input.durationDone * w.caloriesPerMin;
+  }
+  return input.repsDone * w.sets * w.caloriesPerMin;
 };

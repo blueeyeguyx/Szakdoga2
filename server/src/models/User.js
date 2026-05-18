@@ -20,6 +20,32 @@ const macroHistorySchema = new mongoose.Schema({
     fat : Number
 });
 
+const dailyLogSchema = new mongoose.Schema({
+  date: { type: Date, default: Date.now },
+
+  workouts: [
+    {
+      workoutId: String,
+      name: String,
+      reps: Number,
+      duration: Number,
+      caloriesBurned: Number,
+    },
+  ],
+
+  meals: [
+    {
+      mealId: String,
+      name: String,
+      grams: Number,
+      calories: Number,
+    },
+  ],
+
+  totalBurned: Number,
+  totalIntake: Number,
+});
+
 const userSchema = new mongoose.Schema({
     name : String,
     age : Number,
@@ -35,7 +61,8 @@ const userSchema = new mongoose.Schema({
     password : {type: String, required : true},
     weightHistory : [weightHistorySchema],
     workoutHistory : [workoutHistorySchema],
-    macroHistory : [macroHistorySchema]
+    macroHistory : [macroHistorySchema],
+    dailyLogs: [dailyLogSchema]
 });
 
 export const  User = mongoose.model("User", userSchema);

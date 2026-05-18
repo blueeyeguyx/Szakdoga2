@@ -6,6 +6,8 @@ export const workoutSchema = new mongoose.Schema({
   type: String,
   sets: Number,
   reps: Number,
+  duration: Number,
   caloriesPerMin: Number,
+  muscleGroup: [String]
 });
 export const Workout = mongoose.model("Workout", workoutSchema);

@@ -1,0 +1,23 @@
+export const generateHIIT = async (user) => {
+  const workouts = await Workout.find({
+    type: "cardio",
+  }).lean();
+
+  return [
+    {
+      day: "Hétfő",
+      type: "hiit",
+      workouts: pick(workouts, 4),
+    },
+    {
+      day: "Kedd",
+      type: "rest",
+      workouts: [],
+    },
+    {
+      day: "Szerda",
+      type: "hiit",
+      workouts: pick(workouts, 4),
+    },
+  ];
+};

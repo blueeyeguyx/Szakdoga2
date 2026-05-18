@@ -1,9 +1,7 @@
 import express from "express";
-import { weightTracker, workoutTracker, macroTracker } from "../controllers/progresscontroller.js";
+import {saveProgress } from "../controllers/progresscontroller.js";
 
 
 const router = express.Router();
-router.post("/weight",weightTracker);
-router.post("/workout",workoutTracker);
-router.post("/macros",macroTracker);
+router.post("/log",saveProgress);
 export default router;

@@ -45,7 +45,6 @@ export const calculating = async (req, res) => {
     meals: planData.meals,
     workouts: planData.workouts,
   });
-  console.log("FIRST EX:", plan?.workouts?.[0]?.workouts?.[0]);
   user.macroHistory.push({
     date: new Date(),
     calories,

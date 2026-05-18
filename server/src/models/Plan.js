@@ -18,7 +18,32 @@ const workoutItemSchema = new mongoose.Schema(
   },
   { _id: false },
 );
+const dailyLogSchema = new mongoose.Schema({
+  day: String,
+  date: { type: Date, default: Date.now },
 
+  workouts: [
+    {
+      workoutId: String,
+      done: Boolean,
+      repsDone: Number,
+      durationDone: Number,
+      caloriesBurned: Number,
+    },
+  ],
+
+  meals: [
+    {
+      mealId: String,
+      gramsDone: Number,
+      calories: Number,
+    },
+  ],
+
+  totalBurned: Number,
+  totalIntake: Number,
+  net: Number,
+});
 const planSchema = new mongoose.Schema({
   userID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   calories: Number,
@@ -28,5 +53,6 @@ const planSchema = new mongoose.Schema({
   macros: { protein: Number, fat: Number, carbs: Number },
   completed: { type: Boolean, default: false },
   feedback: { type: Number, min: 1, max: 5 },
+  dailyLogs: [dailyLogSchema],
 });
 export const Plan = mongoose.model("Plan", planSchema);

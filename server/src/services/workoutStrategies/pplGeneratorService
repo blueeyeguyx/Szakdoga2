@@ -1,0 +1,51 @@
+import { Workout } from "../../models/Workout.js";
+/*const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+const pick = (arr, count) => {
+  return shuffle(arr).slice(0, count);
+};*/
+
+export const GeneratePPL = async () => {
+  const workouts = await Workout.find().lean();
+
+  const push = workouts.filter((w) =>
+    w.muscleGroup.some((m) =>
+      ["chest", "shoulders", "triceps"].includes(m)
+    )
+  );
+
+  const pull = workouts.filter((w) =>
+    w.muscleGroup.some((m) =>
+      ["back", "biceps"].includes(m)
+    )
+  );
+
+  const legs = workouts.filter((w) =>
+    w.muscleGroup.some((m) =>
+      ["legs", "glutes", "calves"].includes(m)
+    )
+  );
+
+  return [
+    {
+      day: "Hétfő",
+      type: "push",
+      workouts: pick(push, 5),
+    },
+    {
+      day: "Kedd",
+      type: "pull",
+      workouts: pick(pull, 5),
+    },
+    {
+      day: "Szerda",
+      type: "legs",
+      workouts: pick(legs, 5),
+    },
+    {
+      day: "Csütörtök",
+      type: "rest",
+      workouts: [],
+    },
+  ];
+};

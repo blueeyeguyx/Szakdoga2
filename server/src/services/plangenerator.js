@@ -16,7 +16,7 @@ export const GeneratePlan = async (User, Macros, calories) => {
     throw new Error("Meals DB is empty for a category!");
   }
   const days = [
-    "Hetfő",
+    "Hétfő",
     "Kedd",
     "Szerda",
     "Csütörtök",
@@ -28,6 +28,6 @@ export const GeneratePlan = async (User, Macros, calories) => {
     day,
     meals: generateMeals(calories, User.intolerances, foodData),
   }));
-  const workouts = await generateWorkouts(User.goal);
+  const workouts = await generateWorkouts(User);
   return { workouts, meals };
 };
